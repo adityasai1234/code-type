@@ -1,0 +1,56 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String   @id // Clerk user ID
+  email            String   @unique
+  username         String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  lastLoginDate    DateTime?
+  currentStreak    Int      @default(0)
+  longestStreak    Int      @default(0)
+  totalLogins      Int      @default(0)
+
+  typingHistory TypingHistory[]
+
+  @@map("users")
+}
+
+model TypingHistory {
+  id         Int      @id @default(autoincrement())
+  userId     String
+  language   String
+  difficulty String
+  wpm        Int
+  cpm        Int
+  accuracy   Float
+  snippetId  String
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("typing_history")
+}
+
+model GeneratedSnippet {
+  id          Int      @id @default(autoincrement())
+  language    String
+  difficulty  String
+  code        String
+  description String?
+  concepts    String? // JSON string
+  prompt      String? // User's custom prompt
+  createdAt   DateTime @default(now())
+
+  @@map("generated_snippets")
+}
