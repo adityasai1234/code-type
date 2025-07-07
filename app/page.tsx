@@ -4,6 +4,8 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { SignInButton, SignUpButton, UserButton, useUser } from "@clerk/nextjs"
 
+export const dynamic = 'force-dynamic'
+
 export default function Home() {
   const { isLoaded, isSignedIn } = useUser()
 

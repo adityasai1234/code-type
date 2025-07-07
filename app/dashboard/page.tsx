@@ -9,6 +9,8 @@ import { useToast } from "@/hooks/use-toast"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 
+export const dynamic = 'force-dynamic'
+
 export default function DashboardPage() {
   const { user, isLoaded, isSignedIn } = useUser()
   const { toast } = useToast()

@@ -1,4 +1,11 @@
+"use client"
+
+import { useUser } from "@clerk/nextjs"
+import { UserButton } from "@clerk/nextjs"
 import CodeTypingTest from "@/components/code-typing-test"
+import { User } from "lucide-react"
+
+export const dynamic = 'force-dynamic'
 
 export default function PracticePage() {
   return (
