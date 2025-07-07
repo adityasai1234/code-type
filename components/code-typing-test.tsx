@@ -17,6 +17,8 @@ import CodeDisplay from "./code-display"
 import ResultsDisplay from "./results-display"
 import HistoryDisplay from "./history-display"
 import CustomSnippetGenerator from "./custom-snippet-generator"
+import { useTheme } from 'next-themes'
+import { Sun, Moon } from 'lucide-react'
 
 export default function CodeTypingTest() {
   const [language, setLanguage] = useState("javascript")
@@ -49,10 +51,44 @@ export default function CodeTypingTest() {
   const [isGeneratingSnippet, setIsGeneratingSnippet] = useState(false)
   const [generatedSnippets, setGeneratedSnippets] = useState<any[]>([])
   const [isSavingResult, setIsSavingResult] = useState(false)
+  // Add state for live WPM
+  const [liveWpm, setLiveWpm] = useState<number>(0)
+  // Add state for Debug Mode
+  type Mode = "normal" | "debug"
+  const [mode, setMode] = useState<Mode>("normal")
+  // Add buggy/correct snippet pairs for Debug Mode
+  const debugSnippets = [
+    {
+      buggy: `function add(a, b) {
+  return a - b;
+}`,
+      correct: `function add(a, b) {
+  return a + b;
+}`
+    },
+    {
+      buggy: `for(let i = 0; i < 10; i++) {
+  console.log(i)
+  i--;
+}`,
+      correct: `for(let i = 0; i < 10; i++) {
+  console.log(i)
+}`
+    },
+    {
+      buggy: `const arr = [1, 2, 3];
+console.log(arr.lenght);`,
+      correct: `const arr = [1, 2, 3];
+console.log(arr.length);`
+    },
+  ]
+  // Add state to store the correct version in Debug Mode
+  const [debugCorrect, setDebugCorrect] = useState<string | null>(null)
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const { toast } = useToast()
   const { user, isSignedIn } = useUser()
+  const { theme, setTheme } = useTheme()
 
   // Sync user data on mount
   useEffect(() => {
@@ -91,8 +127,19 @@ export default function CodeTypingTest() {
     loadHistory()
   }, [isSignedIn])
 
+  // Add debugging useEffect to check component state
+  useEffect(() => {
+    console.log('Component state:', { isStarted, isFinished, typedText, currentSnippet })
+  }, [isStarted, isFinished, typedText, currentSnippet])
+
   // Get a random snippet based on language and difficulty
   const getRandomSnippet = () => {
+    if (mode === 'debug') {
+      const randomIndex = Math.floor(Math.random() * debugSnippets.length)
+      setDebugCorrect(debugSnippets[randomIndex].correct)
+      setCurrentSnippetInfo(null)
+      return debugSnippets[randomIndex].buggy
+    }
     // First try to get from generated snippets
     const availableGenerated = generatedSnippets.filter((s) => s.language === language && s.difficulty === difficulty)
 
@@ -201,6 +248,7 @@ export default function CodeTypingTest() {
 
   // Start a new test
   const startTest = () => {
+    console.log('Starting test...') // Debug log
     const snippet = getRandomSnippet()
     setCurrentSnippet(snippet)
     setTypedText("")
@@ -210,13 +258,18 @@ export default function CodeTypingTest() {
     setEndTime(null)
     setProgress(0)
     setResults(null)
-
-    // Focus the input field
+    setLiveWpm(0)
+    setDebugCorrect(null)
+    
+    // Focus the input field with a longer delay to ensure it works
     setTimeout(() => {
       if (inputRef.current) {
         inputRef.current.focus()
+        console.log('Textarea focused:', inputRef.current) // Debug log
+      } else {
+        console.log('Textarea ref not found') // Debug log
       }
-    }, 0)
+    }, 100)
   }
 
   // Reset the test
@@ -229,21 +282,38 @@ export default function CodeTypingTest() {
     setProgress(0)
     setResults(null)
     setCurrentSnippetInfo(null)
+    setLiveWpm(0)
+    setDebugCorrect(null)
   }
 
   // Handle typing in the textarea
   const handleTyping = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    console.log('Typing event:', e.target.value) // Debug log
     if (!isStarted || isFinished) return
 
     const newText = e.target.value
     setTypedText(newText)
 
-    // Calculate progress
-    const newProgress = Math.min(100, Math.floor((newText.length / currentSnippet.length) * 100))
+    // Calculate progress based on correct code in Debug Mode
+    const targetCode = mode === 'debug' && debugCorrect ? debugCorrect : currentSnippet
+    const newProgress = Math.min(100, Math.floor((newText.length / targetCode.length) * 100))
     setProgress(newProgress)
 
-    // Check if test is complete
-    if (newText.length >= currentSnippet.length) {
+    // Calculate live WPM
+    if (startTime) {
+      const now = Date.now()
+      const elapsedSeconds = (now - startTime) / 1000
+      if (elapsedSeconds > 0) {
+        const words = newText.length / 5
+        const wpm = Math.round(words / (elapsedSeconds / 60))
+        setLiveWpm(wpm)
+      } else {
+        setLiveWpm(0)
+      }
+    }
+
+    // Check if test is complete (compare against correct code in Debug Mode)
+    if (newText.length >= targetCode.length) {
       finishTest(newText)
     }
   }
@@ -435,12 +505,42 @@ export default function CodeTypingTest() {
 
                     <Progress value={progress} className="h-2" />
 
+                    {isStarted && !isFinished && (
+                      <div className="flex items-center gap-4 mb-2">
+                        <span className="text-lg font-semibold">Live WPM: <span className="text-primary">{liveWpm}</span></span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-4 mb-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={mode === "debug"}
+                          onChange={e => setMode(e.target.checked ? "debug" : "normal")}
+                          className="accent-primary"
+                        />
+                        <span className="text-sm font-medium">Debug Mode (fix code bugs as you type)</span>
+                      </label>
+                    </div>
+
+                    <div className="flex justify-end mb-4">
+                      <button
+                        aria-label="Toggle Dark Mode"
+                        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                        className="p-2 rounded-full border border-input bg-background hover:bg-muted transition-colors"
+                        type="button"
+                      >
+                        {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                      </button>
+                    </div>
+
                     <CodeDisplay code={currentSnippet} typedText={typedText} language={language} />
 
                     <textarea
                       ref={inputRef}
                       value={typedText}
                       onChange={handleTyping}
+                      onKeyDown={(e) => console.log('Key pressed:', e.key)} // Debug log
                       className={cn(
                         "w-full h-32 p-4 border rounded-md font-mono text-sm resize-none",
                         "focus:outline-none focus:ring-2 focus:ring-primary",
@@ -451,6 +551,7 @@ export default function CodeTypingTest() {
                       autoComplete="off"
                       autoCorrect="off"
                       spellCheck="false"
+                      style={{ userSelect: 'text' }} // Ensure text selection is enabled
                     />
                   </div>
                 )}

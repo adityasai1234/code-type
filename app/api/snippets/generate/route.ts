@@ -50,11 +50,25 @@ Each snippet should be:
 3. Syntactically correct ${language} code
 4. Related to the user's request: "${customPrompt}"
 5. Be practical and educational
+6. Use different programming patterns and approaches
+7. Include varied syntax and structures
+8. Be creative and unique - avoid repetitive patterns
 
 For ${difficulty} difficulty:
-- Easy: Simple functions, basic syntax, minimal complexity
-- Medium: Multiple functions, some logic, moderate complexity  
-- Hard: Complex algorithms, advanced patterns, higher complexity
+- Easy: Simple functions, basic syntax, minimal complexity, variable declarations, basic operations
+- Medium: Multiple functions, some logic, moderate complexity, loops, conditionals, basic data structures
+- Hard: Complex algorithms, advanced patterns, higher complexity, recursion, advanced data structures, design patterns
+
+Programming patterns to include (vary these):
+- Functions and methods
+- Loops (for, while, forEach, map, filter)
+- Conditionals (if/else, switch, ternary)
+- Data structures (arrays, objects, maps, sets)
+- Error handling (try/catch, null checks)
+- String manipulation
+- Mathematical operations
+- Date/time operations
+- File/API operations (where applicable)
 
 Return the response as a JSON array of objects with this structure:
 [
@@ -68,34 +82,67 @@ Return the response as a JSON array of objects with this structure:
 User Request: ${customPrompt}
 Language: ${language}
 Difficulty: ${difficulty}
-Count: ${count}`
+Count: ${count}
+
+Make each snippet unique and different from the others!`
     } else {
-      // Default generation
+      // Default generation with enhanced variety
       prompt = `Generate ${count} unique ${difficulty} level ${language} code snippets for a typing practice application. Each snippet should be:
 
 1. ${difficulty} difficulty level appropriate for coding practice
 2. Between 50-200 characters long
 3. Syntactically correct ${language} code
-4. Include common programming patterns like functions, loops, conditionals, or data structures
+4. Include diverse programming patterns like functions, loops, conditionals, data structures, error handling, string manipulation, mathematical operations, date/time operations, and more
 5. Be practical and educational
+6. Use different approaches and syntax patterns
+7. Be creative and unique - avoid repetitive patterns
+8. Include real-world scenarios and use cases
 
 For ${difficulty} difficulty:
-- Easy: Simple functions, basic syntax, minimal complexity
-- Medium: Multiple functions, some logic, moderate complexity  
-- Hard: Complex algorithms, advanced patterns, higher complexity
+- Easy: Simple functions, basic syntax, minimal complexity, variable declarations, basic operations, string manipulation, simple calculations
+- Medium: Multiple functions, some logic, moderate complexity, loops, conditionals, basic data structures, error handling, array methods, object manipulation
+- Hard: Complex algorithms, advanced patterns, higher complexity, recursion, advanced data structures, design patterns, async operations, functional programming concepts
+
+Programming patterns to include (vary these extensively):
+- Functions and methods (arrow functions, regular functions, methods)
+- Loops (for, while, forEach, map, filter, reduce, some, every)
+- Conditionals (if/else, switch, ternary, logical operators)
+- Data structures (arrays, objects, maps, sets, stacks, queues)
+- Error handling (try/catch, null checks, optional chaining)
+- String manipulation (template literals, methods, regex)
+- Mathematical operations (Math functions, calculations, algorithms)
+- Date/time operations (Date objects, formatting, calculations)
+- File/API operations (fetch, async/await, promises)
+- Object-oriented concepts (classes, inheritance, encapsulation)
+- Functional programming (pure functions, immutability, composition)
+- Modern language features (destructuring, spread operator, rest parameters)
+
+Real-world scenarios to include:
+- Data processing and transformation
+- User input validation
+- API responses handling
+- File operations
+- Database queries
+- UI interactions
+- Game logic
+- Business logic
+- Utility functions
+- Configuration management
 
 Return the response as a JSON array of objects with this structure:
 [
   {
     "code": "the actual code snippet",
-    "description": "brief description of what the code does",
+    "description": "brief description of what the code does and its real-world application",
     "concepts": ["array of programming concepts used"]
   }
 ]
 
 Language: ${language}
 Difficulty: ${difficulty}
-Count: ${count}`
+Count: ${count}
+
+IMPORTANT: Make each snippet completely unique and different from the others. Use different programming patterns, syntax styles, and real-world scenarios. Avoid repetitive structures!`
     }
 
     console.log("Sending request to Gemini API...")
@@ -138,31 +185,50 @@ Count: ${count}`
     for (let i = 0; i < Math.min(snippets.length, count); i++) {
       const snippet = snippets[i]
 
-      // Save to database
-      const savedSnippet = await prisma.generatedSnippet.create({
-        data: {
+      try {
+        // Save to database
+        const savedSnippet = await prisma.generatedSnippet.create({
+          data: {
+            language,
+            difficulty,
+            code: snippet.code || snippet.text || text.substring(0, 200),
+            description:
+              snippet.description ||
+              (customPrompt ? `Generated ${language} snippet for: ${customPrompt}` : `Generated ${language} snippet`),
+            concepts: JSON.stringify(Array.isArray(snippet.concepts) ? snippet.concepts : [language, difficulty]),
+            prompt: customPrompt || null,
+          },
+        })
+
+        validSnippets.push({
+          id: `generated-${savedSnippet.id}`,
+          code: savedSnippet.code,
+          description: savedSnippet.description,
+          concepts: JSON.parse(savedSnippet.concepts || "[]"),
           language,
           difficulty,
+          generated: true,
+          customPrompt: customPrompt || null,
+          timestamp: savedSnippet.createdAt.toISOString(),
+        })
+      } catch (dbError) {
+        console.error("Database error:", dbError)
+        
+        // Fallback: return snippet without saving to database
+        validSnippets.push({
+          id: `generated-${Date.now()}-${i}`,
           code: snippet.code || snippet.text || text.substring(0, 200),
           description:
             snippet.description ||
             (customPrompt ? `Generated ${language} snippet for: ${customPrompt}` : `Generated ${language} snippet`),
-          concepts: JSON.stringify(Array.isArray(snippet.concepts) ? snippet.concepts : [language, difficulty]),
-          prompt: customPrompt || null,
-        },
-      })
-
-      validSnippets.push({
-        id: `generated-${savedSnippet.id}`,
-        code: savedSnippet.code,
-        description: savedSnippet.description,
-        concepts: JSON.parse(savedSnippet.concepts || "[]"),
-        language,
-        difficulty,
-        generated: true,
-        customPrompt: customPrompt || null,
-        timestamp: savedSnippet.createdAt.toISOString(),
-      })
+          concepts: Array.isArray(snippet.concepts) ? snippet.concepts : [language, difficulty],
+          language,
+          difficulty,
+          generated: true,
+          customPrompt: customPrompt || null,
+          timestamp: new Date().toISOString(),
+        })
+      }
     }
 
     return NextResponse.json({
