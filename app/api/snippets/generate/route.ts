@@ -3,20 +3,40 @@ import { GoogleGenerativeAI } from "@google/generative-ai"
 import { prisma } from "@/lib/database"
 import { auth } from "@clerk/nextjs/server"
 
-// Use the new API key provided by the user
-const GEMINI_API_KEY = "AIzaSyCGw5mhkJYeE_wdGOotsK6r-iZceIquag8"
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY)
+export const dynamic = 'force-dynamic'
+
+// Use environment variable for API key
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY
+
+if (!GEMINI_API_KEY) {
+  console.error("GEMINI_API_KEY environment variable is not set")
+}
+
+const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null
 
 export async function POST(request: Request) {
   try {
     const { userId } = await auth()
     const { language, difficulty, count = 1, customPrompt } = await request.json()
 
+    if (!userId) {
+      return NextResponse.json({ success: false, message: "Authentication required" }, { status: 401 })
+    }
+
     if (!language || !difficulty) {
       return NextResponse.json({ success: false, message: "Language and difficulty are required" }, { status: 400 })
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" })
+    if (!GEMINI_API_KEY || !genAI) {
+      console.error("Gemini API key not configured")
+      return NextResponse.json(
+        { success: false, message: "AI service not configured. Please check your API key." },
+        { status: 500 }
+      )
+    }
+
+    // Use the correct Gemini model name
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
 
     let prompt = ""
 
@@ -78,9 +98,12 @@ Difficulty: ${difficulty}
 Count: ${count}`
     }
 
+    console.log("Sending request to Gemini API...")
     const result = await model.generateContent(prompt)
     const response = await result.response
     const text = response.text()
+    
+    console.log("Received response from Gemini:", text.substring(0, 200) + "...")
 
     // Try to parse the JSON response
     let snippets
@@ -89,6 +112,9 @@ Count: ${count}`
       const cleanText = text.replace(/```json\n?|\n?```/g, "").trim()
       snippets = JSON.parse(cleanText)
     } catch (parseError) {
+      console.error("Failed to parse JSON response:", parseError)
+      console.log("Raw response:", text)
+      
       // If JSON parsing fails, create a fallback response
       snippets = [
         {
@@ -148,10 +174,18 @@ Count: ${count}`
     })
   } catch (error) {
     console.error("Error generating snippets:", error)
+    
+    // More detailed error logging
+    if (error instanceof Error) {
+      console.error("Error message:", error.message)
+      console.error("Error stack:", error.stack)
+    }
+    
     return NextResponse.json(
       {
         success: false,
         message: "Failed to generate code snippets. Please check your API key and try again.",
+        error: process.env.NODE_ENV === 'development' && error instanceof Error ? error.message : undefined
       },
       { status: 500 },
     )
