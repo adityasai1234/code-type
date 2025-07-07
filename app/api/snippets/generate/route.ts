@@ -3,7 +3,9 @@ import { GoogleGenerativeAI } from "@google/generative-ai"
 import { prisma } from "@/lib/database"
 import { auth } from "@clerk/nextjs/server"
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
+// Use the new API key provided by the user
+const GEMINI_API_KEY = "AIzaSyCGw5mhkJYeE_wdGOotsK6r-iZceIquag8"
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY)
 
 export async function POST(request: Request) {
   try {
