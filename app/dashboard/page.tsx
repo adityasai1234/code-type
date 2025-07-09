@@ -4,7 +4,8 @@ import { useUser } from "@clerk/nextjs"
 import { UserButton } from "@clerk/nextjs"
 import CodeTypingTest from "@/components/code-typing-test"
 import StreakDisplay from "@/components/streak-display"
-import { User } from "lucide-react"
+import FeedbackSystem from "@/components/feedback-system"
+import { User, MessageSquare } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
@@ -96,6 +97,14 @@ export default function DashboardPage() {
 
         <StreakDisplay />
         <CodeTypingTest />
+        
+        <div className="mt-8">
+          <div className="flex items-center gap-2 mb-4">
+            <MessageSquare className="h-5 w-5" />
+            <h2 className="text-2xl font-semibold">Feedback & Testing</h2>
+          </div>
+          <FeedbackSystem />
+        </div>
       </div>
     </main>
   )

@@ -19,6 +19,10 @@ import HistoryDisplay from "./history-display"
 import CustomSnippetGenerator from "./custom-snippet-generator"
 import { useTheme } from 'next-themes'
 import { Sun, Moon } from 'lucide-react'
+import dynamic from 'next/dynamic'
+
+// Move MonacoEditor dynamic import to top level
+const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false })
 
 export default function CodeTypingTest() {
   const [language, setLanguage] = useState("javascript")
@@ -84,6 +88,10 @@ console.log(arr.length);`
   ]
   // Add state to store the correct version in Debug Mode
   const [debugCorrect, setDebugCorrect] = useState<string | null>(null)
+  // Add state for debug output
+  const [debugOutput, setDebugOutput] = useState<string | null>(null)
+  // Add Debug toggle state
+  const [debugMode, setDebugMode] = useState(false)
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const { toast } = useToast()
@@ -260,6 +268,7 @@ console.log(arr.length);`
     setResults(null)
     setLiveWpm(0)
     setDebugCorrect(null)
+    setDebugOutput(null)
     
     // Focus the input field with a longer delay to ensure it works
     setTimeout(() => {
@@ -284,6 +293,7 @@ console.log(arr.length);`
     setCurrentSnippetInfo(null)
     setLiveWpm(0)
     setDebugCorrect(null)
+    setDebugOutput(null)
   }
 
   // Handle typing in the textarea
@@ -376,6 +386,34 @@ console.log(arr.length);`
       title: "Test completed!",
       description: `WPM: ${wpm}, Accuracy: ${accuracy}%${isSignedIn ? " (Saved to cloud)" : ""}`,
     })
+  }
+
+  // Monaco Editor onChange handler
+  const handleEditorChange = (value: string | undefined) => {
+    if (typeof value === 'string') {
+      // Simulate textarea event for compatibility
+      handleTyping({ target: { value } } as any)
+    }
+  }
+
+  // Add runCode function for JS
+  const runCode = () => {
+    setDebugOutput(null)
+    if (language === 'javascript') {
+      try {
+        // eslint-disable-next-line no-eval
+        // Use Function constructor for safer eval
+        // Only for demo purposes, not for production
+        // You may want to sandbox this in real apps
+        // eslint-disable-next-line no-new-func
+        const result = Function(`"use strict";${typedText}`)()
+        setDebugOutput(String(result))
+      } catch (err: any) {
+        setDebugOutput(err.message)
+      }
+    } else {
+      setDebugOutput('Run is only supported for JavaScript.')
+    }
   }
 
   return (
@@ -523,6 +561,18 @@ console.log(arr.length);`
                       </label>
                     </div>
 
+                    <div className="flex items-center gap-4 mb-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={debugMode}
+                          onChange={e => setDebugMode(e.target.checked)}
+                          className="accent-primary"
+                        />
+                        <span className="text-sm font-medium">Debug (syntax errors & run JS)</span>
+                      </label>
+                    </div>
+
                     <div className="flex justify-end mb-4">
                       <button
                         aria-label="Toggle Dark Mode"
@@ -536,23 +586,40 @@ console.log(arr.length);`
 
                     <CodeDisplay code={currentSnippet} typedText={typedText} language={language} />
 
-                    <textarea
-                      ref={inputRef}
+                    <MonacoEditor
+                      height="200px"
+                      language={language}
                       value={typedText}
-                      onChange={handleTyping}
-                      onKeyDown={(e) => console.log('Key pressed:', e.key)} // Debug log
-                      className={cn(
-                        "w-full h-32 p-4 border rounded-md font-mono text-sm resize-none",
-                        "focus:outline-none focus:ring-2 focus:ring-primary",
-                        "bg-background border-input",
-                      )}
-                      placeholder="Start typing here..."
-                      disabled={isFinished}
-                      autoComplete="off"
-                      autoCorrect="off"
-                      spellCheck="false"
-                      style={{ userSelect: 'text' }} // Ensure text selection is enabled
+                      theme={theme === 'dark' ? 'vs-dark' : 'light'}
+                      options={{
+                        fontSize: 14,
+                        minimap: { enabled: false },
+                        lineNumbers: 'on',
+                        readOnly: isFinished,
+                        wordWrap: 'on',
+                        scrollBeyondLastLine: false,
+                        tabSize: 2,
+                        automaticLayout: true,
+                        // Show errors only if debugMode is enabled
+                        // Monaco does this by default, but you can further customize diagnostics if needed
+                      }}
+                      onChange={handleEditorChange}
                     />
+                    {debugMode && language === 'javascript' && (
+                      <button
+                        className="mt-2 px-4 py-2 bg-primary text-white rounded hover:bg-primary/80"
+                        onClick={runCode}
+                        disabled={isFinished}
+                        type="button"
+                      >
+                        Run
+                      </button>
+                    )}
+                    {debugMode && debugOutput && (
+                      <div className="mt-2 p-2 bg-muted rounded text-sm">
+                        <strong>Output:</strong> {debugOutput}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
